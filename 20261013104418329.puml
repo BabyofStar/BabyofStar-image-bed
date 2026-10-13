@@ -1,0 +1,154 @@
+@startuml
+' SCI 第三轮需求建模：梁馨主笔
+' Scope: SCI 应用侧核心业务对象；不设计数据库表、接口字段或部署。
+title SCI 应用侧核心领域类图（第三轮初稿）
+top to bottom direction
+
+skinparam defaultFontName Microsoft YaHei
+skinparam defaultFontSize 15
+skinparam shadowing false
+skinparam backgroundColor white
+skinparam ArrowColor #475569
+skinparam ArrowFontColor #334155
+skinparam classAttributeIconSize 0
+skinparam nodesep 48
+skinparam ranksep 62
+skinparam class {
+  BackgroundColor #F8FAFC
+  BorderColor #64748B
+  FontColor #0F172A
+  HeaderBackgroundColor #E2E8F0
+}
+skinparam class<<center>> {
+  BackgroundColor #DBEAFE
+  BorderColor #2563EB
+  FontColor #0F172A
+  HeaderBackgroundColor #BFDBFE
+}
+skinparam class<<result>> {
+  BackgroundColor #ECFDF5
+  BorderColor #059669
+  FontColor #064E3B
+  HeaderBackgroundColor #D1FAE5
+}
+skinparam class<<record>> {
+  BackgroundColor #FFF7ED
+  BorderColor #EA580C
+  FontColor #7C2D12
+  HeaderBackgroundColor #FFEDD5
+}
+hide circle
+hide empty methods
+hide stereotype
+
+class "作业场景" as Scene {
+  场景标识
+  场景名称
+}
+
+class "巡检航线" as Route {
+  航线标识／编号
+  航线名称
+  可用状态
+}
+
+class "无人机设备" as Device {
+  设备标识
+  型号
+  设备状态
+}
+
+class "操作员" as Operator {
+  操作员标识
+  操作员姓名
+  角色标识
+}
+
+class "巡检任务" as Task <<center>> {
+  任务标识
+  巡检时间
+  任务状态
+  处理状态
+  覆盖度
+  部分结果标识
+}
+
+class "巡检成果" as Result <<result>> {
+  成果标识
+  成果状态
+  处理阶段
+  处理进度
+  失败原因
+  点云／模型引用
+}
+
+class "堆体明细" as Pile <<result>> {
+  堆体标识
+  货位标识
+  体积
+  折算吨数
+  异常类型
+  边界／标签引用
+}
+
+class "巡检报告" as Report <<result>> {
+  报告标识
+  报告文件引用
+  可用状态
+}
+
+class "附件" as Attachment <<result>> {
+  附件标识
+  文件名
+  附件类型
+  文件大小
+  MD5 摘要
+  完整性／可用状态
+}
+
+class "同步记录" as SyncRecord <<record>> {
+  同步码
+  到期时间
+  同步时间
+  数据包大小
+  同步状态
+  完整性结果
+}
+
+Scene "1" -right- "0..*" Route : 包含／属于
+Route -[hidden]right- Device
+Device -[hidden]right- Operator
+
+Scene "0..1" -- "0..*" Task : 发生于\n{启动前必选}
+Route "0..1" -- "0..*" Task : 执行\n{启动前必选、场景一致}
+Device "0..1" -- "0..*" Task : 由设备执行\n{启动前必选}
+Operator "0..1" -- "0..*" Task : 由操作员发起／执行\n{启动前必选}
+
+Task "1" -- "0..1" Result : 产生
+Task "1" -- "0..1" Report : 提供
+Task "1" -- "0..*" Attachment : 拥有
+Task "1" -- "0..*" SyncRecord : 形成
+Result "1" -- "0..*" Pile : 包含
+
+Result -[hidden]right- Report
+Report -[hidden]right- Attachment
+Attachment -[hidden]right- SyncRecord
+
+note right of Task
+  关键约束与待确认：
+  • 准备态可暂缺场景／航线／设备／操作员，启动前必须补齐。
+  • Web 查看者／下载者不默认等同任务操作员（SCI-Q09）。
+  • 成果重处理是否保留多版本见 SCI-Q03。
+  • 必需附件、报告文件关系见 SCI-Q18。
+  • 实际文件、授权、存储与下载反馈见 SCI-Q20。
+end note
+
+legend bottom
+  矩形表示业务类；类内只列少量核心业务属性；实线表示对象关联。
+  0..1 表示允许暂缺，0..* 表示零个或多个；花括号写业务约束。
+  关联不是执行顺序；本图不设计数据库表、接口字段、技术组件或部署。
+  未使用组合／聚合和继承；报告—附件、逐文件同步校验等未定关系不画死。
+endlegend
+
+footer 依据：SCI 需求书 §3.4、§4.1～§4.4、§6.2、§8.1；D04～D08；SCI-Q03／Q09／Q18／Q20。
+@enduml
