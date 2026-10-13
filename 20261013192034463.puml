@@ -1,0 +1,186 @@
+@startuml
+' SCI 第三轮需求建模：梁馨主笔
+' Scope: SCI 应用侧核心业务对象；不设计数据库表、接口字段或部署。
+title SCI 应用侧核心领域类图（第三轮初稿）
+top to bottom direction
+
+skinparam defaultFontName Microsoft YaHei
+skinparam defaultFontSize 15
+skinparam shadowing false
+skinparam backgroundColor white
+skinparam ArrowColor #475569
+skinparam ArrowFontColor #334155
+skinparam classAttributeIconSize 0
+skinparam nodesep 48
+skinparam ranksep 62
+skinparam class {
+  BackgroundColor #F8FAFC
+  BorderColor #64748B
+  FontColor #0F172A
+  HeaderBackgroundColor #E2E8F0
+}
+skinparam class<<center>> {
+  BackgroundColor #DBEAFE
+  BorderColor #2563EB
+  FontColor #0F172A
+  HeaderBackgroundColor #BFDBFE
+}
+skinparam class<<result>> {
+  BackgroundColor #ECFDF5
+  BorderColor #059669
+  FontColor #064E3B
+  HeaderBackgroundColor #D1FAE5
+}
+skinparam class<<record>> {
+  BackgroundColor #FFF7ED
+  BorderColor #EA580C
+  FontColor #7C2D12
+  HeaderBackgroundColor #FFEDD5
+}
+hide circle
+hide empty methods
+hide stereotype
+
+class "作业场景" as Scene {
+  场景标识
+  场景名称
+}
+
+class "巡检航线" as Route {
+  航线标识／编号
+  航线名称
+  可用状态
+}
+
+class "无人机设备" as Device {
+  设备标识
+  型号
+  设备状态
+}
+
+class "操作员" as Operator {
+  操作员标识
+  操作员姓名
+  角色标识
+}
+
+class "巡检任务" as Task <<center>> {
+  任务标识
+  巡检时间
+  任务状态
+  处理状态
+  覆盖度
+  部分结果标识
+}
+
+class "巡检成果" as Result <<result>> {
+  成果标识
+  成果状态
+  处理阶段
+  处理进度
+  失败原因
+  点云／模型引用
+  盘点计数明细（货位／层数／每层件数／总件数）
+}
+
+class "堆体明细" as Pile <<result>> {
+  堆体标识
+  货位标识
+  体积
+  折算吨数
+  异常类型
+  边界／标签引用
+}
+
+class "巡检报告" as Report <<result>> {
+  报告标识
+  报告文件引用
+  可用状态
+}
+
+class "附件" as Attachment <<result>> {
+  附件标识
+  文件名
+  附件类型
+  文件大小
+  清单 MD5 摘要
+  完整性／可用状态
+}
+
+class "同步码" as SyncCode <<record>> {
+  码值
+  生成时间
+  有效期／到期时间
+  有效状态
+}
+
+class "同步记录" as SyncRecord <<record>> {
+  同步记录标识
+  来源设备
+  同步时间
+  数据包大小
+  同步状态
+  整体完整性结果
+}
+
+class "附件校验结果" as FileCheck <<record>> {
+  校验时间
+  实际 MD5 摘要（文件缺失时为空）
+  校验结果
+  缺失／异常说明
+}
+
+Scene "1" -right- "0..*" Route : 包含／属于
+Route -[hidden]right- Device
+Device -[hidden]right- Operator
+
+Scene "0..1" -- "0..*" Task : 发生于
+Route "0..1" -- "0..*" Task : 执行\n{场景一致}
+Device "0..1" -- "0..*" Task : 由设备执行
+Operator "0..1" -- "0..*" Task : 由操作员发起／执行
+
+Task "1" -- "0..1" Result : 产生\n{0..1为建模假设；数量／版本待确认}
+Task "1" -- "0..1" Report : 提供\n{0..1为建模假设；数量／版本待确认}
+Task "1" -- "0..*" Attachment : 拥有
+Task "1" -- "0..*" SyncCode : 生成\n{重生成／保留数量待确认}
+SyncCode "1" -- "0..*" SyncRecord : 用于同步
+SyncRecord "1" -- "0..*" FileCheck : 产生逐文件校验结果
+Attachment "1" -- "0..*" FileCheck : 被校验
+Result "1" -- "0..*" Pile : 包含
+
+Result -[hidden]right- Report
+Report -[hidden]right- Attachment
+Attachment -[hidden]right- SyncCode
+SyncCode -[hidden]right- SyncRecord
+SyncRecord -[hidden]right- FileCheck
+
+note right of Task
+  关键约束与待确认：
+  • 场景／航线／设备／操作员端的 0..1 是首版建模假设；准备态可否缺失及何时必选待确认。
+  • Web 查看者／下载者不默认等同任务操作员（SCI-Q09）。
+  • 成果、报告的 0..1 上限是建模假设；数量与版本规则待确认（成果见 SCI-Q03）。
+  • 同步码及有效期与每次同步记录分开；逐附件 MD5 校验为已有需求。
+  • 补传、同步码重生成和附件版本细则待确认。
+  • 必需附件、报告文件关系见 SCI-Q18。
+  • 实际文件、授权、存储与下载反馈见 SCI-Q20。
+end note
+
+note bottom of Result
+  盘点计数由巡检成果承接，按货位记录。
+  能对应堆体的计数可关联堆体明细；无堆体对应时仍可保留。
+end note
+
+note bottom of FileCheck
+  附件包括清单中的预期文件条目，不要求文件已收到。
+  文件未收到时仍可关联该条目并记录“缺失”；实际 MD5 为空。
+end note
+
+legend bottom
+  矩形表示业务类；类内只列少量核心业务属性；实线表示对象关联。
+  0..1 表示允许暂缺，0..* 表示零个或多个；花括号写业务约束。
+  关联不是执行顺序；本图不设计数据库表、接口字段、技术组件或部署。
+  未使用组合／聚合和继承；报告—附件等未定关系不画死。
+endlegend
+
+footer 依据：SCI 需求书 §3.4、§4.1～§4.4、§6.2、§8.1；D04～D08；SCI-Q03／Q09／Q18／Q20。
+@enduml
