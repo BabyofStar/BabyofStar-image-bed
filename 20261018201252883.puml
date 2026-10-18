@@ -1,0 +1,206 @@
+@startuml
+' SCI 第四轮模型整合：梁馨主笔
+' Scope: SCI 应用侧核心业务对象；不设计数据库表、接口字段或部署。
+title SCI 应用侧核心领域类图（第四轮整合候选稿）
+top to bottom direction
+
+skinparam defaultFontName Microsoft YaHei
+skinparam defaultFontSize 15
+skinparam shadowing false
+skinparam backgroundColor white
+skinparam ArrowColor #475569
+skinparam ArrowFontColor #334155
+skinparam classAttributeIconSize 0
+skinparam nodesep 88
+skinparam ranksep 70
+skinparam ArrowFontSize 14
+skinparam class {
+  BackgroundColor #F8FAFC
+  BorderColor #64748B
+  FontColor #0F172A
+  HeaderBackgroundColor #E2E8F0
+}
+skinparam class<<center>> {
+  BackgroundColor #DBEAFE
+  BorderColor #2563EB
+  FontColor #0F172A
+  HeaderBackgroundColor #BFDBFE
+}
+skinparam class<<result>> {
+  BackgroundColor #ECFDF5
+  BorderColor #059669
+  FontColor #064E3B
+  HeaderBackgroundColor #D1FAE5
+}
+skinparam class<<record>> {
+  BackgroundColor #FFF7ED
+  BorderColor #EA580C
+  FontColor #7C2D12
+  HeaderBackgroundColor #FFEDD5
+}
+hide circle
+hide empty methods
+hide stereotype
+
+class "作业场景" as Scene {
+  场景标识
+  场景名称
+  场景地图引用
+}
+
+class "巡检航线" as Route {
+  航线标识／编号
+  航线名称
+  可用状态
+}
+
+class "无人机设备" as Device {
+  设备标识
+  型号
+  设备状态
+}
+
+class "操作员" as Operator {
+  操作员标识
+  操作员姓名
+  角色标识
+}
+
+class "巡检任务" as Task <<center>> {
+  任务标识
+  巡检时间
+  任务状态（巡检执行）
+  覆盖度
+  部分结果标识
+}
+
+class "巡检成果" as Result <<result>> {
+  成果标识
+  成果状态
+  处理阶段／进度
+  失败原因
+  点云／模型引用
+  折算所用容重
+  本机到期时间
+  本机可用／失效状态
+}
+
+class "堆体测算明细" as Pile <<result>> {
+  堆体标识
+  货位标识
+  体积（m³）
+  折算吨数
+  异常类型
+  边界／标签引用
+}
+
+class "盘点计数明细" as Count <<result>> {
+  计数明细标识
+  货位标识
+  层数
+  每层件数
+  总件数
+  标签引用
+}
+
+class "巡检报告" as Report <<result>> {
+  报告标识
+  报告文件引用
+  可用状态
+}
+
+class "附件清单项" as Attachment <<result>> {
+  附件标识
+  文件名／附件类型
+  预期文件大小
+  清单 MD5 摘要
+  文件接收／可用状态
+}
+
+class "同步码" as SyncCode <<record>> {
+  码值
+  生成时间
+  到期时间（生成后 7 天）
+  有效／过期状态
+}
+
+class "同步尝试" as SyncAttempt <<record>> {
+  同步尝试标识
+  来源设备
+  发起／完成时间
+  数据包大小
+  同步状态
+  整体完整性结果
+}
+
+class "附件校验结果" as FileCheck <<record>> {
+  校验时间
+  实际 MD5 摘要（缺失时为空）
+  校验结果
+  缺失／异常说明
+}
+
+Scene "1" -right- "0..*" Route : 包含／属于
+Route -[hidden]right- Device
+' 操作员改放任务左侧，分散配置关联的任务端标签。
+
+Scene "0..1" -- "0..*" Task : 发生于\n{准备态可暂缺；起飞前必须为 1}
+Route "0..1" -- "0..*" Task : 执行\n{起飞前必须为 1；与场景一致}
+Device "0..1" -- "0..*" Task : 由设备执行\n{起飞前必须为 1；执行中禁止切换}
+Operator "0..1" -right- "0..*" Task : 发起
+
+Task "1" -- "待确认" Result : 产生\n{数量／版本：SCI-Q03}
+Task "1" -- "待确认" Report : 提供\n{数量／版本待确认}
+Task "1" -- "0..*" Attachment : 列出预期附件
+Task "1" -- "待确认" SyncCode : 生成\n{码数量／历史规则待确认}
+SyncCode "1" --- "0..*" SyncAttempt : 用于发起
+SyncAttempt "1" --- "0..*" FileCheck : 产生逐附件校验结果
+Attachment "1" -- "0..*" FileCheck : 被校验
+Result "1" -- "0..*" Pile : 汇总
+Result "1" -- "0..*" Count : 汇总
+
+Result -[hidden]right- Report
+Report -[hidden]right- Attachment
+Attachment -[hidden]right- SyncCode
+Pile -[hidden]right- Count
+
+note right of Task
+  配置约束：
+  • 准备态兼容暂缺；起飞前确定场景／航线／设备／操作员。
+  • 场景与航线由工作人员人工确认。
+  • App 同时只连接一台设备；任务执行中禁止切换设备。
+  • 上述约束不推导完整的设备绑定历史。
+  • 任务状态只表达巡检执行，处理状态由巡检成果承接。
+  • 巡检结束不代表成果就绪；不扩展完整账号系统。
+end note
+
+note bottom of Result
+  成果汇总与多条堆体／盘点明细分开；处理状态只在成果承接。
+  本机保留 7 天；保留期起算点待确认，不预设为成果生成时。
+  容重采用值暂由成果承接；适用范围与历史待确认。
+  重处理是否保留多版本待确认（SCI-Q03）。
+end note
+
+note bottom of Count
+  盘点计数按货位记录，不要求先存在对应堆体。
+  计数与堆体的一一／一对多对应规则无依据，主图不画死。
+end note
+
+note bottom of FileCheck
+  附件清单项表示预期文件；文件未收到不等于没有清单项。
+  缺失时仍保留清单项并记录“缺失”，实际 MD5 为空。
+  同任务约束：本次尝试使用的同步码与被校验附件清单项，
+  必须属于同一巡检任务；不得混入其他任务的附件。
+  同步重试是否复用原尝试、补传及替换规则待确认。
+end note
+
+legend bottom
+  矩形表示业务类；类内只列少量核心业务属性；实线表示对象关联。
+  0..1 表示零或一个，0..* 表示零个或多个；准备态及起飞前条件另注。
+  “待确认”为评审稿占位，非 UML 正式多重度；不得按 1 或 0..* 解读。
+  关联不是执行顺序；本图不设计数据库表、接口字段、技术组件或部署。
+  未使用组合／聚合和继承；S01／S02 是逻辑存储，不作为领域类。
+endlegend
+
+footer 已读：第四轮任务书；需求书 V1.0（main@ad5fa038，§4.1／§4.2／§6.2／§8.1）；第三轮个人稿。指定用例 v1.8／DFD v1.1 正文未核对。
+@enduml
